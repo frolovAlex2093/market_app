@@ -15,4 +15,16 @@ public class OrderDto {
     private Long id;
     private List<ItemDto> items;
     private Long totalSum;
+
+    public Long id() {
+        return id;
+    }
+
+    public List<ItemDto> items() {
+        return items;
+    }
+
+    public Long totalSum() {
+        return totalSum;
+    }
 }

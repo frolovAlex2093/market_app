@@ -49,21 +49,29 @@ public class ItemController {
                 })
                 .collect(Collectors.toList());
 
+        // Исправляем создание списка списков
         List<List<ItemDto>> itemsInRows = new ArrayList<>();
-        for (int i = 0; i < itemDtos.size(); i += 3) {
-            int end = Math.min(i + 3, itemDtos.size());
-            itemsInRows.add(itemDtos.subList(i, end));
-        }
 
-        while (itemsInRows.isEmpty() || itemsInRows.getLast().size() < 3) {
-            if (itemsInRows.isEmpty()) {
-                itemsInRows.add(new ArrayList<>());
+        // Если товаров нет, создаем пустые строки
+        if (itemDtos.isEmpty()) {
+            List<ItemDto> emptyRow = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                emptyRow.add(ItemDto.builder().id(-1L).build());
             }
-            List<ItemDto> lastRow = itemsInRows.getLast();
-            if (lastRow.size() < 3) {
-                lastRow.add(ItemDto.builder().id(-1L).build());
-            } else {
-                break;
+            itemsInRows.add(emptyRow);
+        } else {
+            // Разбиваем на строки по 3 товара
+            for (int i = 0; i < itemDtos.size(); i += 3) {
+                int end = Math.min(i + 3, itemDtos.size());
+                // Создаем новую копию списка, а не view
+                List<ItemDto> row = new ArrayList<>(itemDtos.subList(i, end));
+
+                // Добавляем заглушки, если нужно
+                while (row.size() < 3) {
+                    row.add(ItemDto.builder().id(-1L).build());
+                }
+
+                itemsInRows.add(row);
             }
         }
 

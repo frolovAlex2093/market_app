@@ -14,4 +14,20 @@ public class PagingDto {
     private int pageNumber;
     private boolean hasPrevious;
     private boolean hasNext;
+
+    public int pageSize() {
+        return pageSize;
+    }
+
+    public int pageNumber() {
+        return pageNumber;
+    }
+
+    public boolean hasPrevious() {
+        return hasPrevious;
+    }
+
+    public boolean hasNext() {
+        return hasNext;
+    }
 }
