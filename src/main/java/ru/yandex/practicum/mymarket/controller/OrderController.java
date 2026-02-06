@@ -14,7 +14,7 @@ import ru.yandex.practicum.mymarket.service.OrderService;
 public class OrderController {
     private final OrderService orderService;
 
-    @GetMapping
+    @GetMapping // Переносим путь сюда
     public Mono<String> getOrders(Model model) {
         return orderService.getAllOrders().collectList()
                 .doOnNext(orders -> model.addAttribute("orders", orders))
@@ -22,8 +22,8 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public Mono<String> getOrder(@PathVariable Long id,
-                                 @RequestParam(defaultValue = "false") boolean newOrder,
+    public Mono<String> getOrder(@PathVariable("id") Long id,
+                                 @RequestParam(value = "newOrder", defaultValue = "false") boolean newOrder,
                                  Model model) {
         return orderService.getOrderById(id)
                 .doOnNext(order -> {
@@ -34,7 +34,7 @@ public class OrderController {
                 .switchIfEmpty(Mono.just("redirect:/orders"));
     }
 
-    @PostMapping("/buy")
+    @PostMapping("/buy") // Теперь совпадает с HTML <form action="/buy">
     public Mono<String> buy(WebSession session) {
         return orderService.createOrderFromCart(session)
                 .map(order -> "redirect:/orders/" + order.id() + "?newOrder=true");

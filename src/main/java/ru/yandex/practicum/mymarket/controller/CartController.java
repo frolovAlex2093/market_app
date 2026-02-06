@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.CartRequest;
 import ru.yandex.practicum.mymarket.model.enums.CartAction;
 import ru.yandex.practicum.mymarket.service.CartService;
 
@@ -30,9 +31,8 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCart(@RequestParam Long id, @RequestParam String action,
-                                   WebSession session, Model model) {
-        return cartService.updateItem(session, id, CartAction.fromString(action))
-                .then(getCart(session, model));
+    public Mono<String> updateCart(CartRequest request, WebSession session) {
+        return cartService.updateItem(session, request.getId(), CartAction.fromString(request.getAction()))
+                .thenReturn("redirect:/cart/items");
     }
 }

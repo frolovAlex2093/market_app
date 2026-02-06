@@ -3,10 +3,12 @@ package ru.yandex.practicum.mymarket.repository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveSortingRepository;
+import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.model.Item;
 
+@Repository
 public interface ItemRepository extends ReactiveSortingRepository<Item, Long> {
 
     @Query("SELECT * FROM items WHERE LOWER(title) LIKE LOWER(CONCAT('%', :search, '%')) " +

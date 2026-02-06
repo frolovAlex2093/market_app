@@ -6,6 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.CartRequest;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.PagingDto;
 import ru.yandex.practicum.mymarket.model.enums.CartAction;
@@ -25,10 +26,10 @@ public class ItemController {
 
     @GetMapping({"/", "/items"})
     public Mono<String> getItems(
-            @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "NO") String sort,
-            @RequestParam(defaultValue = "1") int pageNumber,
-            @RequestParam(defaultValue = "5") int pageSize,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "sort", defaultValue = "NO") String sort,
+            @RequestParam(value = "pageNumber", defaultValue = "1") Integer pageNumber,
+            @RequestParam(value = "pageSize", defaultValue = "5") Integer pageSize,
             WebSession session, Model model) {
 
         SortType sortType = SortType.fromString(sort);
@@ -46,36 +47,31 @@ public class ItemController {
                 .collectList()
                 .zipWith(itemService.getCount(search))
                 .map(tuple -> {
-                    List<ItemDto> dtos = tuple.getT1();
-                    long totalItems = tuple.getT2();
-
-                    model.addAttribute("items", partitionItems(dtos));
-                    model.addAttribute("search", search);
+                    model.addAttribute("items", partitionItems(tuple.getT1()));
+                    model.addAttribute("search", search != null ? search : "");
                     model.addAttribute("sort", sortType.name());
                     model.addAttribute("paging", PagingDto.builder()
                             .pageSize(pageSize)
                             .pageNumber(pageNumber)
                             .hasPrevious(pageNumber > 1)
-                            .hasNext(totalItems > (long) pageNumber * pageSize)
+                            .hasNext(tuple.getT2() > (long) pageNumber * pageSize)
                             .build());
                     return "items";
                 });
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCartFromList(
-            @RequestParam Long id, @RequestParam String action,
-            @RequestParam(required = false) String search, @RequestParam String sort,
-            @RequestParam int pageNumber, @RequestParam int pageSize,
-            WebSession session) {
-
-        return cartService.updateItem(session, id, CartAction.fromString(action))
+    public Mono<String> updateCartFromList(CartRequest request, WebSession session) {
+        return cartService.updateItem(session, request.getId(), CartAction.fromString(request.getAction()))
                 .thenReturn(String.format("redirect:/items?search=%s&sort=%s&pageNumber=%d&pageSize=%d",
-                        search != null ? search : "", sort, pageNumber, pageSize));
+                        request.getSearch() != null ? request.getSearch() : "",
+                        request.getSort(),
+                        request.getPageNumber(),
+                        request.getPageSize()));
     }
 
     @GetMapping("/items/{id}")
-    public Mono<String> getItem(@PathVariable Long id, WebSession session, Model model) {
+    public Mono<String> getItem(@PathVariable("id") Long id, WebSession session, Model model) {
         return itemService.getItemById(id)
                 .flatMap(item -> cartService.getItemCount(session, id)
                         .map(count -> ItemDto.builder()
@@ -87,10 +83,12 @@ public class ItemController {
     }
 
     @PostMapping("/items/{id}")
-    public Mono<String> updateCartFromPage(@PathVariable Long id, @RequestParam String action,
-                                           WebSession session, Model model) {
-        return cartService.updateItem(session, id, CartAction.fromString(action))
-                .then(getItem(id, session, model));
+    public Mono<String> updateCartFromPage(@PathVariable("id") Long id,
+                                           CartRequest request,
+                                           WebSession session) {
+        // id берем из пути, а action из объекта request
+        return cartService.updateItem(session, id, CartAction.fromString(request.getAction()))
+                .thenReturn("redirect:/items/" + id);
     }
 
     private List<List<ItemDto>> partitionItems(List<ItemDto> items) {
@@ -101,8 +99,7 @@ public class ItemController {
             rows.add(row);
         }
         if (rows.isEmpty())
-            rows.add(List.of(ItemDto.builder().id(-1L).build(), ItemDto.builder().id(-1L).build(),
-                    ItemDto.builder().id(-1L).build()));
+            rows.add(List.of(ItemDto.builder().id(-1L).build(), ItemDto.builder().id(-1L).build(), ItemDto.builder().id(-1L).build()));
         return rows;
     }
 }

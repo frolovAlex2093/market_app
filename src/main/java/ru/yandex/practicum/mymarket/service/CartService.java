@@ -24,19 +24,20 @@ public class CartService {
     }
 
     public Mono<Void> updateItem(WebSession session, Long itemId, CartAction action) {
-        return Mono.fromRunnable(() -> {
-            Map<Long, Integer> cart = getCartMap(session);
-            switch (action) {
-                case PLUS -> cart.put(itemId, cart.getOrDefault(itemId, 0) + 1);
-                case MINUS -> {
-                    int count = cart.getOrDefault(itemId, 0);
-                    if (count > 1) cart.put(itemId, count - 1);
-                    else cart.remove(itemId);
-                }
-                case DELETE -> cart.remove(itemId);
+        Map<Long, Integer> cart = new HashMap<>(getCartMap(session));
+
+        switch (action) {
+            case PLUS -> cart.put(itemId, cart.getOrDefault(itemId, 0) + 1);
+            case MINUS -> {
+                int count = cart.getOrDefault(itemId, 0);
+                if (count > 1) cart.put(itemId, count - 1);
+                else cart.remove(itemId);
             }
-            session.getAttributes().put(CART_KEY, cart);
-        });
+            case DELETE -> cart.remove(itemId);
+        }
+
+        session.getAttributes().put(CART_KEY, cart);
+        return session.save();
     }
 
     public Flux<ItemDto> getCartItems(WebSession session) {
@@ -64,6 +65,7 @@ public class CartService {
     }
 
     public Mono<Void> clearCart(WebSession session) {
-        return Mono.fromRunnable(() -> session.getAttributes().remove(CART_KEY));
+        session.getAttributes().remove(CART_KEY);
+        return session.save();
     }
 }
