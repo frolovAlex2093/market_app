@@ -1,4 +1,4 @@
-package ru.yandex.practicum.mymarket.enums;
+package ru.yandex.practicum.mymarket.model.enums;
 
 public enum SortType {
     NO, ALPHA, PRICE;

@@ -1,104 +1,76 @@
 package ru.yandex.practicum.mymarket.service;
 
-import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.dto.OrderDto;
-import ru.yandex.practicum.mymarket.model.Item;
-import ru.yandex.practicum.mymarket.model.Order;
-import ru.yandex.practicum.mymarket.model.OrderItem;
-import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
-import ru.yandex.practicum.mymarket.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.ItemDto;
+import ru.yandex.practicum.mymarket.dto.OrderDto;
+import ru.yandex.practicum.mymarket.model.Order;
+import ru.yandex.practicum.mymarket.model.OrderItem;
+import ru.yandex.practicum.mymarket.repository.ItemRepository;
+import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
+import ru.yandex.practicum.mymarket.repository.OrderRepository;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
-
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final ItemService itemService;
+    private final ItemRepository itemRepository;
     private final CartService cartService;
 
-    public List<OrderDto> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        return orders.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
+    public Flux<OrderDto> getAllOrders() {
+        return orderRepository.findAll().flatMap(this::enrichOrder);
     }
 
-    public Optional<OrderDto> getOrderById(Long id) {
-        return orderRepository.findById(id)
-                .map(this::convertToDto);
+    public Mono<OrderDto> getOrderById(Long id) {
+        return orderRepository.findById(id).flatMap(this::enrichOrder);
     }
 
     @Transactional
-    public OrderDto createOrderFromCart() {
-        Map<Long, Integer> cartItems = cartService.getCartItemsMap();
+    public Mono<OrderDto> createOrderFromCart(WebSession session) {
+        Map<Long, Integer> cartMap = cartService.getCartMap(session);
+        if (cartMap.isEmpty()) return Mono.error(new IllegalStateException("Cart is empty"));
 
-        if (cartItems.isEmpty()) {
-            throw new IllegalStateException("Cart is empty");
-        }
-
-        Order order = Order.builder()
-                .created(LocalDateTime.now())  // Добавляем эту строку
-                .totalSum(0L)
-                .build();
-
-        Order savedOrder = orderRepository.save(order);
-        List<OrderItem> orderItems = new ArrayList<>();
-        Long totalSum = 0L;
-
-        for (Map.Entry<Long, Integer> entry : cartItems.entrySet()) {
-            Optional<Item> itemOpt = itemService.getItemById(entry.getKey());
-            if (itemOpt.isPresent()) {
-                Item item = itemOpt.get();
-                Long itemTotal = item.getPrice() * entry.getValue();
-                totalSum += itemTotal;
-
-                OrderItem orderItem = OrderItem.builder()
-                        .order(savedOrder)
-                        .item(item)
-                        .quantity(entry.getValue())
-                        .price(item.getPrice())
-                        .build();
-
-                orderItems.add(orderItem);
-            }
-        }
-
-        orderItemRepository.saveAll(orderItems);
-
-        savedOrder.setTotalSum(totalSum);
-        savedOrder.setItems(orderItems);
-        orderRepository.save(savedOrder);
-
-        cartService.clearCart();
-
-        return convertToDto(savedOrder);
+        return cartService.calculateTotal(session)
+                .flatMap(total -> orderRepository.save(Order.builder()
+                        .created(LocalDateTime.now())
+                        .totalSum(total)
+                        .build()))
+                .flatMap(savedOrder ->
+                        Flux.fromIterable(cartMap.entrySet())
+                                .flatMap(entry -> itemRepository.findById(entry.getKey())
+                                        .flatMap(item -> orderItemRepository.save(OrderItem.builder()
+                                                .orderId(savedOrder.getId())
+                                                .itemId(item.getId())
+                                                .quantity(entry.getValue())
+                                                .price(item.getPrice())
+                                                .build())))
+                                .then(cartService.clearCart(session))
+                                .then(enrichOrder(savedOrder))
+                );
     }
 
-    private OrderDto convertToDto(Order order) {
-        List<ItemDto> itemDtos = order.getItems().stream()
-                .map(orderItem -> ItemDto.builder()
-                        .id(orderItem.getItem().getId())
-                        .title(orderItem.getItem().getTitle())
-                        .price(orderItem.getPrice())
-                        .count(orderItem.getQuantity())
-                        .build())
-                .collect(Collectors.toList());
-
-        return OrderDto.builder()
-                .id(order.getId())
-                .items(itemDtos)
-                .totalSum(order.getTotalSum())
-                .build();
+    private Mono<OrderDto> enrichOrder(Order order) {
+        return orderItemRepository.findByOrderId(order.getId())
+                .flatMap(oi -> itemRepository.findById(oi.getItemId())
+                        .map(item -> ItemDto.builder()
+                                .id(item.getId())
+                                .title(item.getTitle())
+                                .price(oi.getPrice())
+                                .count(oi.getQuantity())
+                                .build()))
+                .collectList()
+                .map(items -> OrderDto.builder()
+                        .id(order.getId())
+                        .items(items)
+                        .totalSum(order.getTotalSum())
+                        .build());
     }
 }
