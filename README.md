@@ -1,6 +1,6 @@
 # market_app# My Market Application
 
-Веб-приложение интернет-магазина с использованием Spring Boot.
+Веб-приложение интернет-магазина с использованием Spring Boot, Spring WebFlux.
 
 ## Функциональность
 
@@ -13,10 +13,11 @@
 
 - Java 21
 - Spring Boot 3.2.2
-- Spring Data JPA
+- Spring WebFlux (Reactive Stack)
 - H2 Database (in-memory)
 - Thymeleaf
 - Maven
+- Spring Data R2DBC (Reactive Relational Database Connectivity)
 
 
 ## Сборка и запуск
