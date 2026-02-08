@@ -15,27 +15,27 @@ import java.time.Duration;
 @SpringBootTest
 class ServiceIntegrationTest {
 
-    @Autowired private CartService cartService;
-    @Autowired private OrderService orderService;
-    @Autowired private ItemRepository itemRepository;
+    @Autowired
+    private CartService cartService;
+    @Autowired
+    private OrderService orderService;
+    @Autowired
+    private ItemRepository itemRepository;
 
     @Test
     void cartToOrderIntegrationTest() {
         MockWebSession session = new MockWebSession();
-        // Ждем пока DataInitializer наполнит базу
-        Item item = itemRepository.findAllBy(PageRequest.of(0, 1))
-                .blockFirst(Duration.ofSeconds(5));
-
-        if (item == null) {
-            item = itemRepository.save(Item.builder().title("T").imgPath("i").price(100L).build()).block();
-        }
-
-        final Long price = item.getPrice();
+        // Создаем тестовый товар, чтобы не зависеть от DataInitializer
+        Item item = itemRepository.save(Item.builder()
+                .title("Test Item")
+                .imgPath("img.jpg")
+                .price(500L)
+                .build()).block();
 
         cartService.updateItem(session, item.getId(), CartAction.PLUS)
                 .then(orderService.createOrderFromCart(session))
                 .as(StepVerifier::create)
-                .expectNextMatches(orderDto -> orderDto.getTotalSum().equals(price))
+                .expectNextMatches(orderDto -> orderDto.totalSum() == 500L)
                 .verifyComplete();
     }
 }

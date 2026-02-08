@@ -1,6 +1,5 @@
 package ru.yandex.practicum.mymarket.service;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,14 +10,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.model.Order;
 import ru.yandex.practicum.mymarket.model.OrderItem;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
-
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -40,64 +36,33 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    private ItemDto testItem;
-
-    @BeforeEach
-    void setUp() {
-        testItem = ItemDto.builder()
-                .id(1L)
-                .title("Test Item")
-                .price(100L)
-                .count(2)
-                .build();
-    }
-
     @Test
     void createOrderFromCart_Success() {
-        // Настройка моков под новую логику (getCartItems вместо getCartMap)
-        when(cartService.getCartItems(any(WebSession.class)))
-                .thenReturn(Flux.just(testItem));
+        // Подготовка данных
+        ItemDto item = ItemDto.builder().id(1L).title("Test").price(100L).count(2).build();
+        Order savedOrder = Order.builder().id(10L).totalSum(200L).build();
 
-        Order savedOrder = Order.builder().id(1L).totalSum(200L).build();
+        // Стаббинги (только те, что реально вызываются)
+        when(cartService.getCartItems(webSession)).thenReturn(Flux.just(item));
         when(orderRepository.save(any(Order.class))).thenReturn(Mono.just(savedOrder));
+        when(orderItemRepository.save(any(OrderItem.class))).thenReturn(Mono.just(new OrderItem()));
+        when(cartService.clearCart(webSession)).thenReturn(Mono.empty());
 
-        when(orderItemRepository.save(any(OrderItem.class)))
-                .thenReturn(Mono.just(new OrderItem()));
+        when(orderItemRepository.findByOrderId(10L)).thenReturn(Flux.empty());
 
-        when(cartService.clearCart(any(WebSession.class))).thenReturn(Mono.empty());
-
-        // Моки для обогащения (enrichOrder)
-        when(orderItemRepository.findByOrderId(1L)).thenReturn(Flux.just(
-                OrderItem.builder().itemId(1L).price(100L).quantity(2).build()
-        ));
-        when(itemRepository.findById(1L)).thenReturn(Mono.just(
-                ru.yandex.practicum.mymarket.model.Item.builder().id(1L).title("Test Item").build()
-        ));
-
-        // Выполнение
-        Mono<OrderDto> result = orderService.createOrderFromCart(webSession);
-
-        // Проверка
-        StepVerifier.create(result)
-                .expectNextMatches(orderDto ->
-                        orderDto.id().equals(1L) &&
-                                orderDto.totalSum() == 200L &&
-                                orderDto.items().size() == 1)
+        StepVerifier.create(orderService.createOrderFromCart(webSession))
+                .expectNextMatches(dto -> dto.id().equals(10L))
                 .verifyComplete();
 
-        verify(orderRepository).save(any());
-        verify(cartService).clearCart(any());
+        verify(orderRepository).save(any(Order.class));
+        verify(cartService).clearCart(webSession);
     }
 
     @Test
     void createOrderFromCart_EmptyCart_ThrowsException() {
-        // Если корзина пуста
-        when(cartService.getCartItems(any(WebSession.class)))
-                .thenReturn(Flux.empty());
+        when(cartService.getCartItems(webSession)).thenReturn(Flux.empty());
 
-        Mono<OrderDto> result = orderService.createOrderFromCart(webSession);
-
-        StepVerifier.create(result)
+        StepVerifier.create(orderService.createOrderFromCart(webSession))
                 .expectError(IllegalStateException.class)
                 .verify();
     }

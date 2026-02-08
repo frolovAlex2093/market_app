@@ -8,20 +8,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import ru.yandex.practicum.mymarket.model.CartItem;
 import ru.yandex.practicum.mymarket.model.enums.CartAction;
+import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
 import java.util.HashMap;
-import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CartServiceTest {
 
     @Mock
+    private CartItemRepository cartItemRepository;
+    @Mock
     private ItemRepository itemRepository;
-
     @Mock
     private WebSession session;
 
@@ -29,30 +32,42 @@ class CartServiceTest {
     private CartService cartService;
 
     @Test
-    void updateItem_plus_shouldAddQuantity() {
-        // 1. Подготовка данных
-        Map<String, Object> attributes = new HashMap<>();
-
-        // 2. Настройка поведения мока session
-        when(session.getAttributes()).thenReturn(attributes);
-        // Настраиваем, чтобы при попытке достать корзину возвращалась пустая мапа
-        when(session.getAttributeOrDefault(anyString(), any())).thenReturn(new HashMap<Long, Integer>());
-
-        // ВАЖНО: Добавляем эту строку, чтобы session.save() не возвращал null
+    void updateItem_plus_shouldSaveToDb() {
+        String sid = "test-session";
+        when(session.getId()).thenReturn(sid);
+        when(session.getAttributes()).thenReturn(new HashMap<>());
         when(session.save()).thenReturn(Mono.empty());
 
-        // 3. Вызов метода
-        Mono<Void> result = cartService.updateItem(session, 1L, CartAction.PLUS);
+        when(cartItemRepository.findBySessionIdAndItemId(anyString(), anyLong()))
+                .thenReturn(Mono.empty());
+        when(cartItemRepository.save(any(CartItem.class)))
+                .thenReturn(Mono.just(new CartItem()));
 
-        // 4. Проверка
-        StepVerifier.create(result)
+        StepVerifier.create(cartService.updateItem(session, 1L, CartAction.PLUS))
                 .verifyComplete();
 
-        // Проверяем, что в атрибутах сессии появилась корзина с правильным товаром
-        @SuppressWarnings("unchecked")
-        Map<Long, Integer> cart = (Map<Long, Integer>) attributes.get("CART_ITEMS");
+        verify(cartItemRepository).save(any(CartItem.class));
+        verify(session).save();
+    }
 
-        assert cart != null;
-        assert cart.get(1L) == 1;
+    @Test
+    void updateItem_delete_shouldRemoveFromDb() {
+        String sid = "test-session";
+        when(session.getId()).thenReturn(sid);
+        when(session.getAttributes()).thenReturn(new HashMap<>());
+        when(session.save()).thenReturn(Mono.empty());
+
+        CartItem existingItem = CartItem.builder().quantity(1).build();
+        when(cartItemRepository.findBySessionIdAndItemId(anyString(), anyLong()))
+                .thenReturn(Mono.just(existingItem));
+
+        when(cartItemRepository.deleteBySessionIdAndItemId(anyString(), anyLong()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(cartService.updateItem(session, 1L, CartAction.DELETE))
+                .verifyComplete();
+
+        verify(cartItemRepository).deleteBySessionIdAndItemId(eq(sid), eq(1L));
+        verify(session).save();
     }
 }

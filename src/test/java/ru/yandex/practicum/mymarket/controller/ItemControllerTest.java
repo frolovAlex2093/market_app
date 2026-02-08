@@ -58,4 +58,15 @@ class ItemControllerTest {
                 .exchange()
                 .expectStatus().is3xxRedirection();
     }
+
+    @Test
+    void postItems_InvalidRequest_ShouldBeHandledByGlobalHandler() {
+        webTestClient.post()
+                .uri("/items")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class).consumeWith(res -> {
+                    assert res.getResponseBody().contains("Ошибка");
+                });
+    }
 }
