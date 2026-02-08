@@ -22,3 +22,11 @@ CREATE TABLE IF NOT EXISTS order_items
     quantity INTEGER NOT NULL,
     price    BIGINT  NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS cart_items
+(
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    item_id    BIGINT       NOT NULL,
+    quantity   INTEGER      NOT NULL
+    );

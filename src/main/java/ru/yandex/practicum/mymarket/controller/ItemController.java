@@ -1,5 +1,6 @@
 package ru.yandex.practicum.mymarket.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -61,7 +62,7 @@ public class ItemController {
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCartFromList(CartRequest request, WebSession session) {
+    public Mono<String> updateCartFromList(@Valid CartRequest request, WebSession session) {
         return cartService.updateItem(session, request.getId(), CartAction.fromString(request.getAction()))
                 .thenReturn(String.format("redirect:/items?search=%s&sort=%s&pageNumber=%d&pageSize=%d",
                         request.getSearch() != null ? request.getSearch() : "",
@@ -84,9 +85,8 @@ public class ItemController {
 
     @PostMapping("/items/{id}")
     public Mono<String> updateCartFromPage(@PathVariable("id") Long id,
-                                           CartRequest request,
+                                           @Valid CartRequest request,
                                            WebSession session) {
-        // id берем из пути, а action из объекта request
         return cartService.updateItem(session, id, CartAction.fromString(request.getAction()))
                 .thenReturn("redirect:/items/" + id);
     }

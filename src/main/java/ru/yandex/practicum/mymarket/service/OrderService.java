@@ -15,7 +15,6 @@ import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -35,26 +34,28 @@ public class OrderService {
 
     @Transactional
     public Mono<OrderDto> createOrderFromCart(WebSession session) {
-        Map<Long, Integer> cartMap = cartService.getCartMap(session);
-        if (cartMap.isEmpty()) return Mono.error(new IllegalStateException("Cart is empty"));
+        return cartService.getCartItems(session).collectList()
+                .flatMap(items -> {
+                    if (items.isEmpty()) return Mono.error(new IllegalStateException("Корзина пуста"));
 
-        return cartService.calculateTotal(session)
-                .flatMap(total -> orderRepository.save(Order.builder()
-                        .created(LocalDateTime.now())
-                        .totalSum(total)
-                        .build()))
-                .flatMap(savedOrder ->
-                        Flux.fromIterable(cartMap.entrySet())
-                                .flatMap(entry -> itemRepository.findById(entry.getKey())
-                                        .flatMap(item -> orderItemRepository.save(OrderItem.builder()
-                                                .orderId(savedOrder.getId())
-                                                .itemId(item.getId())
-                                                .quantity(entry.getValue())
-                                                .price(item.getPrice())
-                                                .build())))
-                                .then(cartService.clearCart(session))
-                                .then(enrichOrder(savedOrder))
-                );
+                    long total = items.stream().mapToLong(i -> i.getPrice() * i.getCount()).sum();
+
+                    return orderRepository.save(Order.builder()
+                                    .created(LocalDateTime.now())
+                                    .totalSum(total)
+                                    .build())
+                            .flatMap(savedOrder ->
+                                    Flux.fromIterable(items)
+                                            .flatMap(itemDto -> orderItemRepository.save(OrderItem.builder()
+                                                    .orderId(savedOrder.getId())
+                                                    .itemId(itemDto.getId())
+                                                    .quantity(itemDto.getCount())
+                                                    .price(itemDto.getPrice())
+                                                    .build()))
+                                            .then(cartService.clearCart(session))
+                                            .then(enrichOrder(savedOrder))
+                            );
+                });
     }
 
     private Mono<OrderDto> enrichOrder(Order order) {

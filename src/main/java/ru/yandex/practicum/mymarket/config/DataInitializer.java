@@ -1,6 +1,7 @@
 package ru.yandex.practicum.mymarket.config;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DataInitializer implements CommandLineRunner {
 
     private final ItemRepository itemRepository;
@@ -18,7 +20,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         itemRepository.count()
-                .filter(count -> count == 0) // Если товаров 0
+                .filter(count -> count == 0)
                 .flatMapMany(count -> {
                     List<Item> items = List.of(
                             Item.builder().title("Смартфон").description("Современный смартфон с камерой 48 МП")
@@ -44,6 +46,10 @@ public class DataInitializer implements CommandLineRunner {
                     );
                     return Flux.fromIterable(items).flatMap(itemRepository::save);
                 })
-                .blockLast(); // Блокируем выполнение до завершения вставки всех данных при старте
+                .subscribe(
+                        item -> log.debug("Товар сохранен: {}", item.getTitle()),
+                        error -> log.error("Ошибка при инициализации: ", error),
+                        () -> log.info("Инициализация данных завершена.")
+                );
     }
 }

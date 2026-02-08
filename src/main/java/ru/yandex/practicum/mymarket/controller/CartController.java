@@ -1,5 +1,6 @@
 package ru.yandex.practicum.mymarket.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -31,7 +32,7 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCart(CartRequest request, WebSession session) {
+    public Mono<String> updateCart(@Valid CartRequest request, WebSession session) {
         return cartService.updateItem(session, request.getId(), CartAction.fromString(request.getAction()))
                 .thenReturn("redirect:/cart/items");
     }
