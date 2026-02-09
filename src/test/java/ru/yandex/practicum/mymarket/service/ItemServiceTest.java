@@ -2,25 +2,20 @@ package ru.yandex.practicum.mymarket.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
+import org.mockito.MockitoAnnotations;
 import org.springframework.data.domain.Pageable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 import ru.yandex.practicum.mymarket.model.Item;
+import ru.yandex.practicum.mymarket.model.enums.SortType;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
 
     @Mock
@@ -29,54 +24,31 @@ class ItemServiceTest {
     @InjectMocks
     private ItemService itemService;
 
-    private Item item1;
-    private Item item2;
-
     @BeforeEach
     void setUp() {
-        item1 = Item.builder()
-                .id(1L)
-                .title("Смартфон")
-                .description("Современный смартфон")
-                .price(29999L)
-                .imgPath("/images/phone.jpg")
-                .build();
-
-        item2 = Item.builder()
-                .id(2L)
-                .title("Ноутбук")
-                .description("Мощный ноутбук")
-                .price(74999L)
-                .imgPath("/images/laptop.jpg")
-                .build();
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void getItems_withoutSearchAndSort_shouldReturnAllItems() {
-        // Arrange
-        List<Item> items = Arrays.asList(item1, item2);
-        Page<Item> page = new PageImpl<>(items);
+    void getItems_shouldReturnFluxOfItems() {
+        Item item = Item.builder().id(1L).title("Test").build();
+        when(itemRepository.findAllBy(any(Pageable.class))).thenReturn(Flux.just(item));
 
-        when(itemRepository.findAll((Pageable) any())).thenReturn(page);
+        Flux<Item> result = itemService.getItems(null, SortType.NO, 1, 5);
 
-        // Act
-        Page<Item> result = itemService.getItems(null, "NO", 1, 5);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(2, result.getTotalElements());
+        StepVerifier.create(result)
+                .expectNextMatches(i -> i.getTitle().equals("Test"))
+                .verifyComplete();
     }
 
     @Test
-    void getItemById_whenItemExists_shouldReturnItem() {
-        // Arrange
-        when(itemRepository.findById(1L)).thenReturn(Optional.of(item1));
+    void getCount_shouldReturnMonoLong() {
+        when(itemRepository.count()).thenReturn(Mono.just(10L));
 
-        // Act
-        Optional<Item> result = itemService.getItemById(1L);
+        Mono<Long> result = itemService.getCount(null);
 
-        // Assert
-        assertTrue(result.isPresent());
-        assertEquals("Смартфон", result.get().getTitle());
+        StepVerifier.create(result)
+                .expectNext(10L)
+                .verifyComplete();
     }
 }

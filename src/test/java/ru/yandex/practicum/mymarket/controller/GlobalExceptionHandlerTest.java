@@ -6,29 +6,27 @@ import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
-import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.service.OrderService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(OrderController.class)
-class OrderControllerTest {
+class GlobalExceptionHandlerTest {
 
-    @Autowired
-    private WebTestClient webTestClient;
-
-    @MockBean
-    private OrderService orderService;
+    @Autowired private WebTestClient webTestClient;
+    @MockBean private OrderService orderService;
 
     @Test
-    void buy_shouldRedirectToOrderPage() {
-        OrderDto orderDto = OrderDto.builder().id(123L).build();
-        when(orderService.createOrderFromCart(any())).thenReturn(Mono.just(orderDto));
+    void buy_EmptyCart_ShouldShowErrorPage() {
+        when(orderService.createOrderFromCart(any()))
+                .thenReturn(Mono.error(new IllegalStateException("Корзина пуста")));
 
         webTestClient.post().uri("/orders/buy")
                 .exchange()
-                .expectStatus().is3xxRedirection()
-                .expectHeader().valueEquals("Location", "/orders/123?newOrder=true");
+                .expectStatus().isOk() // Обработчик возвращает View "error"
+                .expectBody(String.class).consumeWith(res -> {
+                    assert res.getResponseBody().contains("Корзина пуста");
+                });
     }
 }

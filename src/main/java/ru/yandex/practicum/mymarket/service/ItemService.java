@@ -1,48 +1,46 @@
 package ru.yandex.practicum.mymarket.service;
 
-import ru.yandex.practicum.mymarket.model.Item;
-import ru.yandex.practicum.mymarket.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.model.Item;
+import ru.yandex.practicum.mymarket.model.enums.SortType;
+import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
 @Service
 @RequiredArgsConstructor
 public class ItemService {
-
     private final ItemRepository itemRepository;
 
-    public Page<Item> getItems(String search, String sort, int pageNumber, int pageSize) {
-        Pageable pageable = createPageable(sort, pageNumber, pageSize);
-
+    public Flux<Item> getItems(String search, SortType sortType, int pageNumber, int pageSize) {
+        Pageable pageable = createPageable(sortType, pageNumber, pageSize);
         if (search != null && !search.trim().isEmpty()) {
             return itemRepository.findBySearch(search.trim(), pageable);
-        } else {
-            return itemRepository.findAll(pageable);
         }
+        return itemRepository.findAllBy(pageable);
     }
 
-    private Pageable createPageable(String sort, int pageNumber, int pageSize) {
-        Sort sorting = Sort.unsorted();
-
-        if ("ALPHA".equals(sort)) {
-            sorting = Sort.by("title").ascending();
-        } else if ("PRICE".equals(sort)) {
-            sorting = Sort.by("price").ascending();
+    public Mono<Long> getCount(String search) {
+        if (search != null && !search.trim().isEmpty()) {
+            return itemRepository.countBySearch(search.trim());
         }
-
-        return PageRequest.of(pageNumber - 1, pageSize, sorting);
+        return itemRepository.count();
     }
 
-    public Optional<Item> getItemById(Long id) {
+    public Mono<Item> getItemById(Long id) {
         return itemRepository.findById(id);
+    }
+
+    private Pageable createPageable(SortType sortType, int pageNumber, int pageSize) {
+        Sort sort = switch (sortType) {
+            case ALPHA -> Sort.by("title").ascending();
+            case PRICE -> Sort.by("price").ascending();
+            default -> Sort.unsorted();
+        };
+        return PageRequest.of(pageNumber - 1, pageSize, sort);
     }
 }

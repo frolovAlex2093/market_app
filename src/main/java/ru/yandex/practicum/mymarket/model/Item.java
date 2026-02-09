@@ -1,34 +1,24 @@
 package ru.yandex.practicum.mymarket.model;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "items")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table("items")
 public class Item {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
     private String title;
-
-    @Column(length = 1000)
     private String description;
-
-    @Column(nullable = false)
     private String imgPath;
-
-    @Column(nullable = false)
     private Long price;
 
     @Transient
+    @Builder.Default
     private Integer count = 0;
 }

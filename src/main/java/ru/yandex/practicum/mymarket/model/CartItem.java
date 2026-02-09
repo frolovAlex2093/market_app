@@ -3,16 +3,16 @@ package ru.yandex.practicum.mymarket.model;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
-import java.time.LocalDateTime;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-@Table("orders")
-public class Order {
+@Table("cart_items")
+public class CartItem {
     @Id
     private Long id;
-    private LocalDateTime created;
-    private Long totalSum;
+    private String sessionId;
+    private Long itemId;
+    private Integer quantity;
 }

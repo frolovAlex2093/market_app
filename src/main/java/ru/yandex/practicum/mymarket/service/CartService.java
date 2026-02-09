@@ -1,81 +1,75 @@
 package ru.yandex.practicum.mymarket.service;
 
-import ru.yandex.practicum.mymarket.dto.ItemDto;
-import ru.yandex.practicum.mymarket.model.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.annotation.SessionScope;
+import org.springframework.web.server.WebSession;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.ItemDto;
+import ru.yandex.practicum.mymarket.model.CartItem;
+import ru.yandex.practicum.mymarket.model.enums.CartAction;
+import ru.yandex.practicum.mymarket.repository.CartItemRepository;
+import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
-@SessionScope
 @RequiredArgsConstructor
 public class CartService {
+    private final CartItemRepository cartItemRepository;
+    private final ItemRepository itemRepository;
 
-    private final ItemService itemService;
-    private Map<Long, Integer> cartItems = new HashMap<>();
+    public Mono<Void> updateItem(WebSession session, Long itemId, CartAction action) {
+        session.getAttributes().put("SESSION_ACTIVATED", true);
 
-    public List<ItemDto> getCartItems() {
-        List<ItemDto> items = new ArrayList<>();
+        String sid = session.getId();
+        return cartItemRepository.findBySessionIdAndItemId(sid, itemId)
+                .defaultIfEmpty(CartItem.builder()
+                        .sessionId(sid)
+                        .itemId(itemId)
+                        .quantity(0)
+                        .build())
+                .flatMap(ci -> {
+                    switch (action) {
+                        case PLUS -> ci.setQuantity(ci.getQuantity() + 1);
+                        case MINUS -> ci.setQuantity(Math.max(0, ci.getQuantity() - 1));
+                        case DELETE -> ci.setQuantity(0);
+                    }
 
-        for (Map.Entry<Long, Integer> entry : cartItems.entrySet()) {
-            Optional<Item> itemOpt = itemService.getItemById(entry.getKey());
-            if (itemOpt.isPresent()) {
-                Item item = itemOpt.get();
-                ItemDto itemDto = ItemDto.builder()
-                        .id(item.getId())
-                        .title(item.getTitle())
-                        .description(item.getDescription())
-                        .imgPath(item.getImgPath())
-                        .price(item.getPrice())
-                        .count(entry.getValue())
-                        .build();
-                items.add(itemDto);
-            }
-        }
-
-        return items;
+                    if (ci.getQuantity() <= 0) {
+                        return cartItemRepository.deleteBySessionIdAndItemId(sid, itemId);
+                    }
+                    return cartItemRepository.save(ci);
+                })
+                .then(session.save());
     }
 
-    public Long calculateTotal() {
-        return getCartItems().stream()
-                .mapToLong(item -> item.getPrice() * item.getCount())
-                .sum();
+    public Flux<ItemDto> getCartItems(WebSession session) {
+        return cartItemRepository.findAllBySessionId(session.getId())
+                .flatMap(ci -> itemRepository.findById(ci.getItemId())
+                        .map(item -> ItemDto.builder()
+                                .id(item.getId())
+                                .title(item.getTitle())
+                                .price(item.getPrice())
+                                .imgPath(item.getImgPath())
+                                .count(ci.getQuantity())
+                                .build()));
     }
 
-    public void addItem(Long itemId) {
-        cartItems.put(itemId, cartItems.getOrDefault(itemId, 0) + 1);
+    public Mono<Long> calculateTotal(WebSession session) {
+        return getCartItems(session)
+                .map(item -> item.getPrice() * item.getCount())
+                .reduce(0L, Long::sum);
     }
 
-    public void removeItem(Long itemId) {
-        Integer count = cartItems.get(itemId);
-        if (count != null) {
-            if (count > 1) {
-                cartItems.put(itemId, count - 1);
-            } else {
-                cartItems.remove(itemId);
-            }
-        }
+    public Mono<Integer> getItemCount(WebSession session, Long itemId) {
+        return cartItemRepository.findBySessionIdAndItemId(session.getId(), itemId)
+                .map(CartItem::getQuantity)
+                .defaultIfEmpty(0);
     }
 
-    public void deleteItem(Long itemId) {
-        cartItems.remove(itemId);
-    }
-
-    public void clearCart() {
-        cartItems.clear();
-    }
-
-    public int getItemCount(Long itemId) {
-        return cartItems.getOrDefault(itemId, 0);
-    }
-
-    public Map<Long, Integer> getCartItemsMap() {
-        return new HashMap<>(cartItems);
+    public Mono<Void> clearCart(WebSession session) {
+        return cartItemRepository.deleteAllBySessionId(session.getId());
     }
 }
