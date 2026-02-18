@@ -27,10 +27,10 @@ public class ItemService {
     public Mono<Item> getItemById(Long id) {
         String key = CACHE_PREFIX + id;
         return redisTemplate.opsForValue().get(key)
-                .doOnNext(item -> log.debug("Товар {} взят из кеша Redis", id))
-                .switchIfEmpty(itemRepository.findById(id)
+                .doOnNext(item -> log.debug("Товар {} взят из кеша", id))
+                .switchIfEmpty(Mono.defer(() -> itemRepository.findById(id)
                         .flatMap(item -> redisTemplate.opsForValue().set(key, item, TTL)
-                                .thenReturn(item)));
+                                .thenReturn(item))));
     }
 
     public Flux<Item> getItems(String search, SortType sortType, int pageNumber, int pageSize) {
