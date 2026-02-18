@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.client.api.DefaultApi;
+import ru.yandex.practicum.mymarket.client.model.PaymentRequest;
 import ru.yandex.practicum.mymarket.dto.ItemDto;
 import ru.yandex.practicum.mymarket.dto.OrderDto;
 import ru.yandex.practicum.mymarket.model.Order;
@@ -23,6 +25,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ItemRepository itemRepository;
     private final CartService cartService;
+    private final DefaultApi paymentApi;
 
     public Flux<OrderDto> getAllOrders() {
         return orderRepository.findAll().flatMap(this::enrichOrder);
@@ -37,13 +40,16 @@ public class OrderService {
         return cartService.getCartItems(session).collectList()
                 .flatMap(items -> {
                     if (items.isEmpty()) return Mono.error(new IllegalStateException("Корзина пуста"));
-
                     long total = items.stream().mapToLong(i -> i.getPrice() * i.getCount()).sum();
 
-                    return orderRepository.save(Order.builder()
+                    // Выполняем платеж через REST сервис
+                    PaymentRequest paymentRequest = new PaymentRequest().amount(total);
+
+                    return paymentApi.processPayment(paymentRequest)
+                            .then(orderRepository.save(Order.builder()
                                     .created(LocalDateTime.now())
                                     .totalSum(total)
-                                    .build())
+                                    .build()))
                             .flatMap(savedOrder ->
                                     Flux.fromIterable(items)
                                             .flatMap(itemDto -> orderItemRepository.save(OrderItem.builder()
@@ -54,7 +60,8 @@ public class OrderService {
                                                     .build()))
                                             .then(cartService.clearCart(session))
                                             .then(enrichOrder(savedOrder))
-                            );
+                            )
+                            .onErrorResume(e -> Mono.error(new IllegalStateException("Ошибка оплаты: " + e.getMessage())));
                 });
     }
 
