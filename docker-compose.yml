@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: market-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - PAYMENT_INITIAL_BALANCE=100000
+    restart: always
+
+  market-app:
+    build: ./market-app
+    container_name: market-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - payment-service
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - PAYMENT_SERVICE_URL=http://payment-service:8081
+      - SPRING_R2DBC_URL=r2dbc:h2:mem:///marketdb;DB_CLOSE_DELAY=-1
+    restart: always
