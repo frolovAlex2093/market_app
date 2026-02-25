@@ -34,9 +34,9 @@ public class OrderController {
                 .switchIfEmpty(Mono.just("redirect:/orders"));
     }
 
-    @PostMapping("/buy") // Теперь совпадает с HTML <form action="/buy">
-    public Mono<String> buy(WebSession session) {
-        return orderService.createOrderFromCart(session)
+    @PostMapping("/buy")
+    public Mono<String> buy() {
+        return orderService.createOrderFromCart()
                 .map(order -> "redirect:/orders/" + order.id() + "?newOrder=true");
     }
 }

@@ -7,7 +7,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.client.api.DefaultApi;
 import ru.yandex.practicum.mymarket.dto.CartRequest;
@@ -22,21 +21,18 @@ public class CartController {
     private final DefaultApi paymentApi;
 
     @GetMapping("/items")
-    public Mono<String> getCart(WebSession session, Model model) {
-        return cartService.getCartItems(session).collectList()
-                .zipWith(cartService.calculateTotal(session))
+    public Mono<String> getCart(Model model) {
+        return cartService.getCartItems().collectList()
+                .zipWith(cartService.calculateTotal())
                 .flatMap(tuple -> {
                     model.addAttribute("items", tuple.getT1());
                     model.addAttribute("total", tuple.getT2());
-
-                    // Проверка баланса в сервисе платежей
                     return paymentApi.getBalance()
-                            .map(balance -> {
+                            .map(b -> {
                                 model.addAttribute("paymentAvailable", true);
-                                model.addAttribute("insufficientFunds", balance.getAmount() < tuple.getT2());
+                                model.addAttribute("insufficientFunds", b.getAmount() < tuple.getT2());
                                 return "cart";
-                            })
-                            .onErrorResume(e -> {
+                            }).onErrorResume(e -> {
                                 model.addAttribute("paymentAvailable", false);
                                 return Mono.just("cart");
                             });
@@ -44,8 +40,8 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public Mono<String> updateCart(@Valid CartRequest request, WebSession session) {
-        return cartService.updateItem(session, request.getId(), CartAction.fromString(request.getAction()))
+    public Mono<String> updateCart(@Valid CartRequest request) {
+        return cartService.updateItem(request.getId(), CartAction.fromString(request.getAction()))
                 .thenReturn("redirect:/cart/items");
     }
 }

@@ -11,11 +11,11 @@ import org.springframework.data.relational.core.mapping.Table;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("cart_items")
-public class CartItem {
+@Table("users")
+public class User {
     @Id
     private Long id;
-    private Long userId;
-    private Long itemId;
-    private Integer quantity;
+    private String username;
+    private String password;
+    private boolean enabled;
 }

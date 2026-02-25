@@ -6,11 +6,11 @@ import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.model.CartItem;
 
 public interface CartItemRepository extends ReactiveCrudRepository<CartItem, Long> {
-    Flux<CartItem> findAllBySessionId(String sessionId);
+    Flux<CartItem> findAllByUserId(Long userId);
 
-    Mono<CartItem> findBySessionIdAndItemId(String sessionId, Long itemId);
+    Mono<CartItem> findByUserIdAndItemId(Long userId, Long itemId);
 
-    Mono<Void> deleteAllBySessionId(String sessionId);
+    Mono<Void> deleteAllByUserId(Long userId);
 
-    Mono<Void> deleteBySessionIdAndItemId(String sessionId, Long itemId);
+    Mono<Void> deleteByUserIdAndItemId(Long userId, Long itemId);
 }

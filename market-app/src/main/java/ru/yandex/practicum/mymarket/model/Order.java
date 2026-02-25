@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class Order {
     @Id
     private Long id;
+    private Long userId;
     private LocalDateTime created;
     private Long totalSum;
 }
