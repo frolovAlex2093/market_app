@@ -1,6 +1,5 @@
 package ru.yandex.practicum.mymarket.repository;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.r2dbc.DataR2dbcTest;
@@ -19,14 +18,32 @@ class ItemRepositoryTest {
         Item item = Item.builder()
                 .title("УникальныйТовар")
                 .description("Описание")
-                .imgPath("/images/item.jpg")
+                .imgPath("images/item.jpg")
                 .price(1000L)
                 .build();
 
         itemRepository.save(item)
                 .thenMany(itemRepository.findBySearch("Уникальный", PageRequest.of(0, 5)))
                 .as(StepVerifier::create)
-                .expectNextMatches(found -> found.getTitle().equals("УникальныйТовар"))
-                .verifyComplete(); // Теперь здесь будет ровно 1 товар
+                .expectNextMatches(found -> {
+                    return found.getTitle().equals("УникальныйТовар") &&
+                            found.getPrice() == 1000L;
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void countBySearch_shouldReturnCorrectCount() {
+        Item item1 = Item.builder().title("Apple").imgPath("img").price(100L).build();
+        Item item2 = Item.builder().title("Pineapple").imgPath("img").price(200L).build();
+        Item item3 = Item.builder().title("Orange").imgPath("img").price(300L).build();
+
+        itemRepository.save(item1)
+                .then(itemRepository.save(item2))
+                .then(itemRepository.save(item3))
+                .then(itemRepository.countBySearch("apple"))
+                .as(StepVerifier::create)
+                .expectNext(2L)
+                .verifyComplete();
     }
 }

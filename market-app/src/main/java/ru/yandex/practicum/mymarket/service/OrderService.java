@@ -43,6 +43,7 @@ public class OrderService {
                     long total = items.stream().mapToLong(i -> i.getPrice() * i.getCount()).sum();
 
                     return paymentApi.processPayment(new PaymentRequest().amount(total))
+                            .onErrorMap(e -> new IllegalStateException("Ошибка оплаты: " + e.getMessage()))
                             .then(orderRepository.save(Order.builder().userId(userId).created(LocalDateTime.now()).totalSum(total).build()))
                             .flatMap(savedOrder -> Flux.fromIterable(items)
                                     .flatMap(i -> orderItemRepository.save(OrderItem.builder()

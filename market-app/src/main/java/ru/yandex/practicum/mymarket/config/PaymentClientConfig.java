@@ -43,9 +43,6 @@ public class PaymentClientConfig {
                 .filter(oauth)
                 .build();
 
-        ApiClient apiClient = new ApiClient(webClient);
-        apiClient.setBasePath(baseUrl);
-
-        return new DefaultApi(apiClient);
+        return new DefaultApi(new ApiClient(webClient).setBasePath(baseUrl));
     }
 }

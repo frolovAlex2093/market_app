@@ -4,25 +4,26 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.yandex.practicum.payment.model.PaymentRequest;
 
 import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:9000")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class PaymentControllerTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
+    @MockBean
+    private ReactiveJwtDecoder jwtDecoder;
+
     @Test
     void getBalance_Unauthorized_ShouldReturn401() {
-        // Проверка, что без токена доступ запрещен
         webTestClient.get()
                 .uri("/balance")
                 .exchange()
@@ -31,7 +32,7 @@ class PaymentControllerTest {
 
     @Test
     void getBalance_WithJwt_ShouldReturnAmount() {
-        webTestClient.mutateWith(mockJwt()) // Имитируем JWT
+        webTestClient.mutateWith(mockJwt())
                 .get()
                 .uri("/balance")
                 .exchange()
