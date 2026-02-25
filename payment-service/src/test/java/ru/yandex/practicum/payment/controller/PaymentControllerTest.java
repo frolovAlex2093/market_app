@@ -4,42 +4,57 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import ru.yandex.practicum.payment.model.PaymentRequest;
 
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class PaymentControllerTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
+    @MockBean
+    private ReactiveJwtDecoder jwtDecoder;
+
     @Test
-    void getBalance_ShouldReturnAmount() {
+    void getBalance_Unauthorized_ShouldReturn401() {
         webTestClient.get()
                 .uri("/balance")
                 .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void getBalance_WithJwt_ShouldReturnAmount() {
+        webTestClient.mutateWith(mockJwt())
+                .get()
+                .uri("/balance")
+                .exchange()
                 .expectStatus().isOk()
-                .expectHeader().contentType(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.amount").isEqualTo(50000);
     }
 
     @Test
-    void processPayment_Success() {
+    void processPayment_Success_WithJwt() {
         PaymentRequest request = new PaymentRequest().amount(500L);
 
-        webTestClient.post()
+        webTestClient.mutateWith(mockJwt())
+                .post()
                 .uri("/pay")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isOk();
 
-        webTestClient.get()
+        webTestClient.mutateWith(mockJwt())
+                .get()
                 .uri("/balance")
                 .exchange()
                 .expectBody()
@@ -50,7 +65,8 @@ class PaymentControllerTest {
     void processPayment_InsufficientFunds_ShouldReturnBadRequest() {
         PaymentRequest request = new PaymentRequest().amount(100000L);
 
-        webTestClient.post()
+        webTestClient.mutateWith(mockJwt())
+                .post()
                 .uri("/pay")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)

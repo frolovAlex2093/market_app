@@ -8,6 +8,16 @@ services:
       - "6379:6379"
     restart: always
 
+
+  auth-server:
+    build: ./auth-server
+    container_name: auth-server
+    ports:
+      - "9000:9000"
+    environment:
+      - SERVER_PORT=9000
+    restart: always
+
   payment-service:
     build: ./payment-service
     container_name: payment-service

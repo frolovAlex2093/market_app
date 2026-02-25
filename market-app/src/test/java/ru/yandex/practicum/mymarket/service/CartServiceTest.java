@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import ru.yandex.practicum.mymarket.model.CartItem;
@@ -13,10 +12,9 @@ import ru.yandex.practicum.mymarket.model.enums.CartAction;
 import ru.yandex.practicum.mymarket.repository.CartItemRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
-import java.util.HashMap;
-
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CartServiceTest {
@@ -26,48 +24,40 @@ class CartServiceTest {
     @Mock
     private ItemRepository itemRepository;
     @Mock
-    private WebSession session;
+    private UserService userService;
 
     @InjectMocks
     private CartService cartService;
 
     @Test
     void updateItem_plus_shouldSaveToDb() {
-        String sid = "test-session";
-        when(session.getId()).thenReturn(sid);
-        when(session.getAttributes()).thenReturn(new HashMap<>());
-        when(session.save()).thenReturn(Mono.empty());
-
-        when(cartItemRepository.findBySessionIdAndItemId(anyString(), anyLong()))
+        Long userId = 1L;
+        when(userService.getCurrentUserId()).thenReturn(Mono.just(userId));
+        when(cartItemRepository.findByUserIdAndItemId(anyLong(), anyLong()))
                 .thenReturn(Mono.empty());
         when(cartItemRepository.save(any(CartItem.class)))
                 .thenReturn(Mono.just(new CartItem()));
 
-        StepVerifier.create(cartService.updateItem(session, 1L, CartAction.PLUS))
+        StepVerifier.create(cartService.updateItem(1L, CartAction.PLUS))
                 .verifyComplete();
 
-        verify(cartItemRepository).save(any(CartItem.class));
-        verify(session).save();
+        verify(cartItemRepository).save(argThat(item -> item.getUserId().equals(userId)));
     }
 
     @Test
     void updateItem_delete_shouldRemoveFromDb() {
-        String sid = "test-session";
-        when(session.getId()).thenReturn(sid);
-        when(session.getAttributes()).thenReturn(new HashMap<>());
-        when(session.save()).thenReturn(Mono.empty());
+        Long userId = 1L;
+        when(userService.getCurrentUserId()).thenReturn(Mono.just(userId));
 
-        CartItem existingItem = CartItem.builder().quantity(1).build();
-        when(cartItemRepository.findBySessionIdAndItemId(anyString(), anyLong()))
+        CartItem existingItem = CartItem.builder().userId(userId).itemId(1L).quantity(1).build();
+        when(cartItemRepository.findByUserIdAndItemId(userId, 1L))
                 .thenReturn(Mono.just(existingItem));
-
-        when(cartItemRepository.deleteBySessionIdAndItemId(anyString(), anyLong()))
+        when(cartItemRepository.deleteByUserIdAndItemId(userId, 1L))
                 .thenReturn(Mono.empty());
 
-        StepVerifier.create(cartService.updateItem(session, 1L, CartAction.DELETE))
+        StepVerifier.create(cartService.updateItem(1L, CartAction.DELETE))
                 .verifyComplete();
 
-        verify(cartItemRepository).deleteBySessionIdAndItemId(eq(sid), eq(1L));
-        verify(session).save();
+        verify(cartItemRepository).deleteByUserIdAndItemId(userId, 1L);
     }
 }

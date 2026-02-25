@@ -5,37 +5,53 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
-import ru.yandex.practicum.mymarket.client.api.DefaultApi;
-import ru.yandex.practicum.mymarket.model.Item;
+import ru.yandex.practicum.mymarket.BaseIntegrationTest;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
-class ItemControllerIntegrationTest {
+@ActiveProfiles("test")
+class ItemControllerIntegrationTest extends BaseIntegrationTest {
 
-    @Autowired private WebTestClient webTestClient;
-
-    @MockBean private ReactiveRedisTemplate<String, Item> redisTemplate;
-    @MockBean private DefaultApi paymentApi;
+    @Autowired
+    private WebTestClient webTestClient;
 
     @BeforeEach
     void setupRedis() {
         ReactiveValueOperations ops = mock(ReactiveValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(ops);
         when(ops.get(anyString())).thenReturn(Mono.empty());
+        when(ops.set(anyString(), any(), any())).thenReturn(Mono.just(true));
     }
 
     @Test
-    void testItemsPageLoads() {
+    void testItemsPageLoadsForAnonymous() {
+        // Главная страница доступна всем
         webTestClient.get().uri("/items")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    @WithMockUser(username = "user")
+    void testItemsPageLoadsForAuthenticated() {
+        webTestClient.get().uri("/items")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void testItemDetailsAnonymous_ShouldReturnOk() {
+        webTestClient.get().uri("/items/1")
                 .exchange()
                 .expectStatus().isOk();
     }

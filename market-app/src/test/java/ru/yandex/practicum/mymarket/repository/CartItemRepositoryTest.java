@@ -5,20 +5,39 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.r2dbc.DataR2dbcTest;
 import reactor.test.StepVerifier;
 import ru.yandex.practicum.mymarket.model.CartItem;
+import ru.yandex.practicum.mymarket.model.User;
 
 @DataR2dbcTest
 class CartItemRepositoryTest {
 
-    @Autowired private CartItemRepository repository;
+    @Autowired
+    private CartItemRepository cartItemRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
-    void shouldSaveAndFindBySession() {
-        CartItem ci = CartItem.builder().sessionId("abc").itemId(1L).quantity(5).build();
+    void shouldSaveAndFindByUserId() {
+        User user = User.builder()
+                .username("testUser")
+                .password("pass")
+                .enabled(true)
+                .build();
 
-        repository.save(ci)
-                .thenMany(repository.findAllBySessionId("abc"))
+        CartItem ci = CartItem.builder()
+                .itemId(1L)
+                .quantity(5)
+                .build();
+
+        userRepository.save(user)
+                .flatMap(savedUser -> {
+                    ci.setUserId(savedUser.getId());
+                    return cartItemRepository.save(ci);
+                })
+                .thenMany(userRepository.findByUsername("testUser")
+                        .flatMapMany(u -> cartItemRepository.findAllByUserId(u.getId())))
                 .as(StepVerifier::create)
-                .expectNextMatches(item -> item.getQuantity() == 5)
+                .expectNextMatches(item -> item.getQuantity() == 5 && item.getItemId() == 1L)
                 .verifyComplete();
     }
 }

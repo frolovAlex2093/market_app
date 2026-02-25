@@ -3,10 +3,13 @@ package ru.yandex.practicum.mymarket.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import ru.yandex.practicum.mymarket.model.Item;
+import ru.yandex.practicum.mymarket.model.User;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
+import ru.yandex.practicum.mymarket.repository.UserRepository;
 
 import java.util.List;
 
@@ -16,9 +19,19 @@ import java.util.List;
 public class DataInitializer implements CommandLineRunner {
 
     private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
+        userRepository.findByUsername("user")
+                .switchIfEmpty(userRepository.save(User.builder()
+                        .username("user")
+                        .password(passwordEncoder.encode("password"))
+                        .enabled(true)
+                        .build()))
+                .subscribe();
+
         itemRepository.count()
                 .filter(count -> count == 0)
                 .flatMapMany(count -> {
